@@ -28,3 +28,5 @@ export const resetContacts = (flag: string, value: any) => ({
   type: ContactsActionTypes.RESET_CONTACTS,
   payload: { flag, value },
 });
+
+

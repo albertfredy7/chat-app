@@ -43,7 +43,12 @@ function* inviteContact(action: InviteContactAction): Generator {
     // Optionally, show a success notification
     yield call(showSuccessNotification, 'Contact successfully invited');
   } catch (error: any) {
-    yield call(showErrorNotification, error);
+    if (error.message === 'Contact already exists') {
+      yield call(showErrorNotification, error.message);
+    }
+    if (error.message === 'User does not exist') {
+      yield call(showErrorNotification, error.message);
+    }
     yield put(
       contactsApiResponseError(ContactsActionTypes.INVITE_CONTACT, error)
     );

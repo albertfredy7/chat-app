@@ -55,51 +55,104 @@ class FirebaseAuthBackend {
 
 
   // add new users to firestore
-  addNewUserToFirestore = (user, userDetails) => { 
-    console.log(userDetails);
-    console.log(userDetails.username);
-    const collection = firebase.firestore().collection("users");
-    const details = {
-     
-      uid: user.uid,
-      email: userDetails.email,
-      username:userDetails.username,
-      photoUrl: "",
-      createdDtm: firebase.firestore.FieldValue.serverTimestamp(),
-    };
-    collection.doc(user.uid).set(details);
-    return { user, details };
-  }
+// add new users to firestore
+// add new users to firestore
+addNewUserToFirestore = (user, userDetails) => {   
+  console.log(userDetails);
+  console.log(userDetails.username);
+  const usersCollection = firebase.firestore().collection("users");
+  const details = {
+    uid: user.uid,
+    email: userDetails.email,
+    username: userDetails.username,
+    photoUrl: "",
+    createdDtm: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  usersCollection.doc(user.uid).set(details)
+    .then(() => {
+      // Create an empty object in the userChats collection with the user's UID
+      return firebase.firestore().collection('userChats').doc(user.uid).set({});
+    })
+    .then(() => {
+      console.log('User and userChats collection created successfully');
+      return { user, details };
+    })
+    .catch(error => {
+      console.error('Error creating user and userChats collection: ', error);
+      throw error;
+    });
+};
 
 
   /// add contacts
  /// add contacts
  inviteContact(userId, contactData) {
-  console.log(contactData);
-  console.log(userId);
   return new Promise((resolve, reject) => {
-    const contactRef = firebase.firestore()
+    // First, check if the email belongs to a registered user
+    firebase.firestore()
       .collection('users')
-      .doc(userId)
-      .collection('contacts') // Subcollection under the user document
-      .doc(); // Create a new document with auto-generated ID
+      .where('email', '==', contactData.email)
+      .get()
+      .then(querySnapshot => {
+        if (querySnapshot.empty) {
+          // No user with the provided email exists
+          reject(new Error('User does not exist'));
+        } else {
+          // A user with the provided email exists, proceed to add the contact
+          const userDoc = querySnapshot.docs[0]; // Assuming there is only one user with the email
+          const userData = userDoc.data(); // Get the user's data
 
-    contactRef.set({
-      ...contactData,
-      contactId: contactRef.id, // Include the auto-generated ID in the document data
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    })
-    .then(() => {
-      console.log('Contact successfully invited');
-      resolve();
-    })
-    .catch(error => {
-      console.error('Error inviting contact: ', error);
-      reject(error);
-    });
+          // Check if a contact with the same email already exists for the current user
+          firebase.firestore()
+            .collection('users')
+            .doc(userId)
+            .collection('contacts')
+            .where('email', '==', contactData.email)
+            .get()
+            .then(querySnapshot => {
+              if (!querySnapshot.empty) {
+                // A contact with the same email already exists for the current user
+                reject(new Error('Contact already exists'));
+              } else {
+                // No contact with the same email exists for the current user, proceed to create a new contact
+                const contactRef = firebase.firestore()
+                  .collection('users')
+                  .doc(userId)
+                  .collection('contacts')
+                  .doc(); // Create a new document with auto-generated ID
+
+                // Include the user's UID, photo URL, and username in the contact data
+                const contactDataWithUserInfo = {
+                  ...contactData,
+                  uid: userData.uid,
+                  photoUrl: userData.photoUrl,
+                  username: userData.username,
+                  contactId: contactRef.id, // Include the auto-generated ID in the document data
+                  timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                };
+
+                contactRef.set(contactDataWithUserInfo)
+                  .then(() => {
+                    console.log('Contact successfully invited');
+                    resolve();
+                  })
+                  .catch(error => {
+                    console.error('Error inviting contact: ', error);
+                    reject(error);
+                  });
+              }
+            }).catch(error => {
+              console.error('Error checking for existing contact: ', error);
+              reject(error);
+            });
+        }
+      })
+      .catch(error => {
+        console.error('Error checking for existing user: ', error);
+        reject(error);
+      });
   });
 }
-
 
 //fetch contacts
 
